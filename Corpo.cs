@@ -8,6 +8,15 @@ namespace HologramaGravitacional
 {
     public class Corpo
     {
+        // Representa um corpo físico no simulador.
+        // Cada instância possui propriedades físicas básicas
+        // (massa, densidade, posição e velocidade) e métodos
+        // para atualizar estado ao longo do tempo.
+        //
+        // Unidades: massa em kg, densidade em kg/m^3, posições em metros,
+        // velocidades em m/s. O raio é calculado a partir de massa e densidade
+        // assumindo forma esférica (apenas para cálculo de colisões).
+
         // Limite máximo de densidade utilizado pelo simulador.
         // O valor está em kg/m³, conforme o Sistema Internacional (SI).
         private const double DensidadeMaxima = 22590;

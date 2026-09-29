@@ -16,6 +16,11 @@ namespace HologramaGravitacional
             this.universo = universo;
         }
 
+        // Classe responsável por orquestrar a execução temporal da simulação.
+        // Calcula estados iniciais (momento, centro de massa, energia), executa
+        // as iterações configuradas no Universo e imprime informações
+        // físicas e de diagnóstico a cada passo.
+
         public void Executar()
         {
             // ============================================================

@@ -1,5 +1,6 @@
-﻿using HologramaGravitacional;
+using System;
 using System.Collections.Generic;
+using System.IO;
 
 namespace HologramaGravitacional
 {
@@ -7,362 +8,258 @@ namespace HologramaGravitacional
     {
         static void Main(string[] args)
         {
-// ============================================================
-// CONFIGURAÇÃO INICIAL
-// ============================================================
+            // Programa principal: gerencia menu, criação/carregamento
+            // do Universo e invocação do simulador ou visualizador.
+            // O arquivo "universo.txt" é usado por padrão para
+            // salvar e carregar o estado da simulação.
+            string caminhoArquivo = "universo.txt";
 
-        string caminhoArquivo = "universo.txt";
+            PersistenciaAbstrata persistencia = new PersistenciaTexto();
 
-            PersistenciaAbstrata persistencia =
-                new PersistenciaTexto();
-
-            Universo universo;
-
-            // ============================================================
-            // ESCOLHA DO USUÁRIO
-            // ============================================================
-
-            Console.WriteLine("==============================================");
-            Console.WriteLine("          HOLOGRAMA GRAVITACIONAL");
-            Console.WriteLine("==============================================");
-
-            Console.WriteLine();
-            Console.WriteLine("1 - Criar novo Universo");
-            Console.WriteLine("2 - Carregar Universo existente");
-            Console.WriteLine("3 - Executar cenário de teste de colisão");
-
-            Console.WriteLine();
-            Console.Write("Escolha uma opção: ");
-
-            string? opcao = Console.ReadLine();
-
-            // ============================================================
-            // CRIAÇÃO DE UM NOVO UNIVERSO
-            // ============================================================
-
-            if (opcao == "1")
+            while (true)
             {
+                // Loop principal do programa. Mantém o menu ativo até que
+                // o usuário escolha sair (opção 4) ou confirme que não
+                // deseja retornar ao menu após uma simulação.
+
+                Console.WriteLine("==============================================");
+                Console.WriteLine("          HOLOGRAMA GRAVITACIONAL");
+                Console.WriteLine("==============================================");
                 Console.WriteLine();
-                Console.Write(
-                "Digite a quantidade de corpos que deseja gerar: "
-                );
+                Console.WriteLine("1 - Criar novo Universo");
+                Console.WriteLine("2 - Carregar Universo existente");
+                Console.WriteLine("3 - Executar cenário de teste de colisão");
+                Console.WriteLine("4 - Sair");
+                Console.WriteLine();
+                Console.Write("Escolha uma opção: ");
 
-                string? entradaQuantidade =
-                Console.ReadLine();
+                string? opcao = Console.ReadLine();
+                Universo? universo = null;
 
-                if (!int.TryParse(
-                entradaQuantidade,
-                out int quantidadeCorpos
-                ) || quantidadeCorpos <= 0)
+                // Opção 1: criar um novo Universo aleatório.
+                // O usuário define quantos corpos e quantas iterações
+                // a simulação deve executar. A configuração inicial é
+                // salva imediatamente em arquivo para permitir recarregamento
+                // posterior.
+                if (opcao == "1")
                 {
                     Console.WriteLine();
-                    Console.WriteLine(
-                    "Quantidade de corpos inválida."
-                    );
+                    Console.Write("Digite a quantidade de corpos que deseja gerar: ");
+                    string? entradaQuantidade = Console.ReadLine();
 
-                return;
-
+                    if (!int.TryParse(entradaQuantidade, out int quantidadeCorpos) || quantidadeCorpos <= 0)
+                    {
+                        Console.WriteLine();
+                        Console.WriteLine("Quantidade de corpos inválida.");
+                        continue;
                     }
 
-                Console.Write(
-                "Digite a quantidade de iterações: "
-                );
+                    Console.Write("Digite a quantidade de iterações: ");
+                    string? entradaIteracoes = Console.ReadLine();
 
-                string? entradaIteracoes =
-                Console.ReadLine();
+                    if (!int.TryParse(entradaIteracoes, out int quantidadeIteracoes) || quantidadeIteracoes <= 0)
+                    {
+                        Console.WriteLine();
+                        Console.WriteLine("Quantidade de iterações inválida.");
+                        continue;
+                    }
 
-                if (!int.TryParse(
-                entradaIteracoes,
-                out int quantidadeIteracoes
-                ) || quantidadeIteracoes <= 0)
+                    // Tempo físico representado por cada iteração
+                    // (Δt em segundos). Esse valor afeta a evolução
+                    // numérica do sistema e a aparência da animação.
+                    double tempoEntreIteracoes = 0.05; // seconds
+                    // Define o tamanho da região onde os corpos serão
+                    // distribuídos inicialmente.
+                    // Unidade: metros.
+                    // Usar uma área menor por padrão para que as
+                    // interações gravitacionais fiquem mais fortes
+                    // e visíveis no visualizador.
+                    double tamanhoArea = 100_000; // meters
+
+                    universo = new Universo();
+                    universo.QuantidadeIteracoes = quantidadeIteracoes;
+                    universo.TempoEntreIteracoes = tempoEntreIteracoes;
+
+                    // Gera os corpos aleatoriamente usando regras definidas em GeradorCorpos
+                    GeradorCorpos gerador = new GeradorCorpos();
+                    List<Corpo> corpos = gerador.Gerar(quantidadeCorpos, tamanhoArea);
+
+                    foreach (Corpo corpo in corpos)
+                        universo.AdicionarCorpo(corpo);
+
+                    // Persiste a configuração inicial em texto (formato especificado)
+                    persistencia.Salvar(universo, caminhoArquivo);
+                    Console.WriteLine();
+                    Console.WriteLine($"Universo salvo em: {caminhoArquivo}");
+                }
+                // Opção 2: carregar um Universo previamente salvo em arquivo.
+                // Validações são feitas no arquivo e o usuário pode ajustar
+                // a quantidade de iterações antes de executar.
+                else if (opcao == "2")
+                {
+                    if (!File.Exists(caminhoArquivo))
+                    {
+                        Console.WriteLine();
+                        Console.WriteLine($"O arquivo '{caminhoArquivo}' não foi encontrado.");
+                        Console.WriteLine("Crie um novo Universo antes de tentar carregá-lo.");
+                        continue;
+                    }
+
+                    try
+                    {
+                        // Tenta reconstruir o Universo lendo o arquivo texto.
+                        // A persistência usa InvariantCulture para números,
+                        // então o arquivo é portátil entre ambientes.
+                        universo = persistencia.Carregar(caminhoArquivo);
+
+                        Console.WriteLine();
+                        Console.WriteLine("Universo carregado com sucesso.");
+                        Console.WriteLine($"Quantidade de corpos: {universo.QuantidadeCorpos}");
+                        Console.WriteLine($"Quantidade de iterações configuradas: {universo.QuantidadeIteracoes}");
+
+                        // Permite ao usuário informar um novo número de iterações
+                        // para continuar a simulação a partir do estado carregado.
+                        Console.Write("Digite a quantidade de novas iterações: ");
+                        string? entrada = Console.ReadLine();
+
+                        if (int.TryParse(entrada, out int novasIteracoes) && novasIteracoes > 0)
+                        {
+                            universo.QuantidadeIteracoes = novasIteracoes;
+                        }
+                        else
+                        {
+                            Console.WriteLine("Quantidade de iterações inválida.");
+                            continue;
+                        }
+                    }
+                    catch (Exception erro)
+                    {
+                        // Em caso de erro na leitura ou formato inválido do arquivo,
+                        // informamos o motivo e retornamos ao menu sem travar o programa.
+                        Console.WriteLine();
+                        Console.WriteLine("Não foi possível carregar o Universo.");
+                        Console.WriteLine($"Motivo: {erro.Message}");
+                        continue;
+                    }
+                }
+                else if (opcao == "3")
+                {
+                    // Opção 3: cria um cenário de teste controlado com dois corpos
+                    // configurados para colidir. Serve para validar o tratamento
+                    // de colisões e fusões do simulador.
+                    universo = new Universo();
+                    universo.QuantidadeIteracoes = 20;
+                    universo.TempoEntreIteracoes = 1.0;
+
+                    // Dois corpos com mesmas massas e densidades, movendo-se
+                    // em direções opostas ao longo do eixo X.
+                    Corpo corpoA = new Corpo("Teste-A", 1e12, 1000, -1000, 0, 100, 0);
+                    Corpo corpoB = new Corpo("Teste-B", 1e12, 1000, 1000, 0, -100, 0);
+
+                    universo.AdicionarCorpo(corpoA);
+                    universo.AdicionarCorpo(corpoB);
+
+                    Console.WriteLine();
+                    Console.WriteLine("Cenário criado com dois corpos.");
+                    Console.WriteLine("Os corpos estão se movendo um em direção ao outro.");
+                    Console.WriteLine($"Raio do corpo A: {corpoA.Raio:E3} m");
+                    Console.WriteLine($"Raio do corpo B: {corpoB.Raio:E3} m");
+                    Console.WriteLine();
+                    Console.WriteLine("Estado inicial:");
+                    Console.WriteLine($"{corpoA.Nome} | X: {corpoA.PosX:F2} m | VX: {corpoA.VelX:F2} m/s");
+                    Console.WriteLine($"{corpoB.Nome} | X: {corpoB.PosX:F2} m | VX: {corpoB.VelX:F2} m/s");
+                }
+                else if (opcao == "4")
                 {
                     Console.WriteLine();
-                    Console.WriteLine(
-                    "Quantidade de iterações inválida."
-                    );
-
-                return;
-
-
+                    Console.WriteLine("Saindo...");
+                    break;
                 }
-
-
-                // Tempo físico representado por cada iteração.
-                // Unidade: segundos.
-                double tempoEntreIteracoes = 0.05;
-
-                // Define o tamanho da região onde os corpos
-                // serão distribuídos inicialmente.
-                // Unidade: metros.
-                double tamanhoArea = 1_000_000;
-
-                universo = new Universo();
-
-                universo.QuantidadeIteracoes =
-                    quantidadeIteracoes;
-
-                universo.TempoEntreIteracoes =
-                    tempoEntreIteracoes;
-
-                // ========================================================
-                // GERAÇÃO DOS CORPOS
-                // ========================================================
-
-                GeradorCorpos gerador =
-                    new GeradorCorpos();
-
-                List<Corpo> corpos =
-                    gerador.Gerar(
-                        quantidadeCorpos,
-                        tamanhoArea
-                    );
-
-                foreach (Corpo corpo in corpos)
+                else
                 {
-                    universo.AdicionarCorpo(corpo);
+                    Console.WriteLine();
+                    Console.WriteLine("Opção inválida.");
+                    continue;
                 }
 
-                // Salva a configuração inicial do Universo.
-                persistencia.Salvar(
-                    universo,
-                    caminhoArquivo
-                );
+                // Se por algum motivo não foi criado ou carregado um Universo
+                // válido (por exemplo, erro de entrada), voltamos ao menu.
+                if (universo == null)
+                    continue;
+
+                // Informações do universo
+                Console.WriteLine();
+                Console.WriteLine($"Quantidade de corpos: {universo.QuantidadeCorpos}");
+                Console.WriteLine($"Quantidade de iterações: {universo.QuantidadeIteracoes}");
+                Console.WriteLine($"Tempo entre iterações: {universo.TempoEntreIteracoes} s");
+                Simulador simulador = new Simulador(universo);
+
+                // Função local para ler resposta obrigatória sim/não (s/n)
+                static bool LerSimNao(string mensagem)
+                {
+                    while (true)
+                    {
+                        Console.Write(mensagem);
+                        string? resp = Console.ReadLine();
+
+                        if (string.IsNullOrWhiteSpace(resp))
+                        {
+                            Console.WriteLine("Resposta inválida. Digite 's' para sim ou 'n' para não.");
+                            continue;
+                        }
+
+                        resp = resp.Trim().ToLowerInvariant();
+
+                        if (resp == "s" || resp == "y")
+                            return true;
+
+                        if (resp == "n")
+                            return false;
+
+                        Console.WriteLine("Resposta inválida. Digite 's' para sim ou 'n' para não.");
+                    }
+                }
 
                 Console.WriteLine();
-                Console.WriteLine(
-                    $"Universo salvo em: {caminhoArquivo}"
-                );
-            }
+                bool abrirVisual = LerSimNao("Deseja abrir a visualização 2D do Universo? (s/n): ");
 
-            // ============================================================
-            // CARREGAMENTO DE UM UNIVERSO EXISTENTE
-            // ============================================================
-
-            else if (opcao == "2")
-            {
-                // Verifica se o arquivo existe antes de tentar
-                // carregar os dados do Universo.
-                if (!File.Exists(caminhoArquivo))
+                if (abrirVisual)
                 {
-                    Console.WriteLine();
-                    Console.WriteLine(
-                    $"O arquivo '{caminhoArquivo}' não foi encontrado."
-                    );
-
-             Console.WriteLine("Crie um novo Universo antes de tentar carregá-lo.");
-
-                    return;
-                }
-
-                try
-                {
-                    universo = persistencia.Carregar(
-                        caminhoArquivo
-                    );
-
-                    Console.WriteLine();
-                    Console.WriteLine(
-                        "Universo carregado com sucesso."
-                    );
-
-                    Console.WriteLine(
-                        $"Quantidade de corpos: " +
-                        $"{universo.QuantidadeCorpos}"
-                    );
-
-                    Console.WriteLine(
-                        $"Quantidade de iterações configuradas: " +
-                        $"{universo.QuantidadeIteracoes}"
-                    );
-
-                    Console.WriteLine();
-
-                    Console.Write(
-                        "Digite a quantidade de novas iterações: "
-                    );
-
-                    string? entrada =
-                        Console.ReadLine();
-
-                    if (int.TryParse(
-                        entrada,
-                        out int novasIteracoes
-                    ) && novasIteracoes > 0)
+                    try
                     {
-                        universo.QuantidadeIteracoes =
-                            novasIteracoes;
+                        var visual = new Visualizador2D(universo);
+                        visual.Run();
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        Console.WriteLine(
-                            "Quantidade de iterações inválida."
-                        );
-
-                        return;
+                        Console.WriteLine();
+                        Console.WriteLine("Não foi possível abrir a visualização 2D.");
+                        Console.WriteLine($"Motivo: {ex.Message}");
+                        Console.WriteLine("Executando simulação no modo console...");
+                        simulador.Executar();
                     }
                 }
-                catch (Exception erro)
+                else
                 {
-                    // Caso o arquivo exista, mas possua dados inválidos
-                    // ou não possa ser lido, o erro é informado ao usuário.
-                    Console.WriteLine();
-                    Console.WriteLine(
-                        "Não foi possível carregar o Universo."
-                    );
-
-                    Console.WriteLine(
-                        $"Motivo: {erro.Message}"
-                    );
-
-                    return;
+                    simulador.Executar();
                 }
 
-                }
-            else if (opcao == "3")
-            {
+                persistencia.Salvar(universo, caminhoArquivo);
+                Console.WriteLine();
+                Console.WriteLine($"Estado atual do Universo salvo em: {caminhoArquivo}");
+
                 Console.WriteLine();
                 Console.WriteLine("==============================================");
-                Console.WriteLine("      CENÁRIO DE TESTE DE COLISÃO");
+                Console.WriteLine("        SIMULAÇÃO FINALIZADA");
                 Console.WriteLine("==============================================");
 
-                universo = new Universo();
-
-                // Define uma quantidade suficiente de iterações
-                // para permitir a aproximação dos corpos.
-                universo.QuantidadeIteracoes = 20;
-
-                // Cada iteração representa 1 segundo.
-                universo.TempoEntreIteracoes = 1.0;
-
-                // Os corpos possuem a mesma massa e densidade para
-                // facilitar a análise do comportamento da colisão.
-                Corpo corpoA = new Corpo(
-                    "Teste-A",
-                    1e12,
-                    1000,
-                    -1000,
-                    0,
-                    100,
-                    0
-                );
-
-                Corpo corpoB = new Corpo(
-                    "Teste-B",
-                    1e12,
-                    1000,
-                    1000,
-                    0,
-                    -100,
-                    0
-                );
-
-                universo.AdicionarCorpo(corpoA);
-                universo.AdicionarCorpo(corpoB);
-
                 Console.WriteLine();
-                Console.WriteLine("Cenário criado com dois corpos.");
-                Console.WriteLine(
-                    "Os corpos estão se movendo um em direção ao outro."
-                );
-
-                Console.WriteLine(
-                    $"Raio do corpo A: {corpoA.Raio:E3} m"
-                );
-
-                Console.WriteLine(
-                    $"Raio do corpo B: {corpoB.Raio:E3} m"
-                );
-
-                Console.WriteLine();
-                Console.WriteLine("Estado inicial:");
-
-                Console.WriteLine(
-                    $"{corpoA.Nome} | X: {corpoA.PosX:F2} m | " +
-                    $"VX: {corpoA.VelX:F2} m/s"
-                );
-
-                Console.WriteLine(
-                    $"{corpoB.Nome} | X: {corpoB.PosX:F2} m | " +
-                    $"VX: {corpoB.VelX:F2} m/s"
-                );
+                bool voltarMenu = LerSimNao("Deseja voltar ao menu principal? (s/n): ");
+                if (!voltarMenu)
+                {
+                    break;
+                }
             }
-
-
-
-
-            // ============================================================
-            // OPÇÃO INVÁLIDA
-            // ============================================================
-
-            else
-            {
-                Console.WriteLine();
-                Console.WriteLine("Opção inválida.");
-
-                return;
-            }
-
-
-
-            // ============================================================
-            // INFORMAÇÕES DO UNIVERSO
-            // ============================================================
-
-            Console.WriteLine();
-
-            Console.WriteLine(
-                $"Quantidade de corpos: " +
-                $"{universo.QuantidadeCorpos}"
-            );
-
-            Console.WriteLine(
-                $"Quantidade de iterações: " +
-                $"{universo.QuantidadeIteracoes}"
-            );
-
-            Console.WriteLine(
-                $"Tempo entre iterações: " +
-                $"{universo.TempoEntreIteracoes} s"
-            );
-
-            // ============================================================
-            // EXECUÇÃO DA SIMULAÇÃO
-            // ============================================================
-
-            Simulador simulador =
-                new Simulador(universo);
-
-            simulador.Executar();
-
-            // ============================================================
-            // SALVAMENTO DO ESTADO ATUAL
-            // ============================================================
-
-            // Após a execução, as posições e velocidades dos corpos
-            // podem ter sido alteradas pela interação gravitacional.
-            // Salvamos novamente o Universo para que esse estado possa
-            // ser carregado posteriormente e a simulação continue.
-            persistencia.Salvar(
-                universo,
-                caminhoArquivo
-            );
-
-            Console.WriteLine();
-
-            Console.WriteLine(
-                $"Estado atual do Universo salvo em: {caminhoArquivo}"
-            );
-
-            // ============================================================
-            // FINALIZAÇÃO
-            // ============================================================
-
-            Console.WriteLine();
-            Console.WriteLine("==============================================");
-            Console.WriteLine("        SIMULAÇÃO FINALIZADA");
-            Console.WriteLine("==============================================");
         }
     }
-
 }
-

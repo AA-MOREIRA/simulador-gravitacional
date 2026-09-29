@@ -26,6 +26,9 @@ namespace HologramaGravitacional
             );
 
             // Cada linha seguinte representa um corpo.
+            // Formato por linha: Nome;massa;densidade;PosX;PosY;VelX;VelY
+            // Números usam InvariantCulture para garantir compatibilidade
+            // entre sistemas que usam vírgula ou ponto como separador.
             foreach (Corpo corpo in universo.Corpos)
             {
                 arquivo.WriteLine(
@@ -56,8 +59,8 @@ namespace HologramaGravitacional
                 );
             }
 
-            string[] configuracao =
-                primeiraLinha.Split(';');
+            // A primeira linha possui três valores separados por ponto e vírgula.
+            string[] configuracao = primeiraLinha.Split(';');
 
             if (configuracao.Length != 3)
             {
@@ -66,17 +69,11 @@ namespace HologramaGravitacional
                 );
             }
 
-            int quantidadeCorpos =
-                int.Parse(configuracao[0]);
+            int quantidadeCorpos = int.Parse(configuracao[0]);
 
-            int quantidadeIteracoes =
-                int.Parse(configuracao[1]);
+            int quantidadeIteracoes = int.Parse(configuracao[1]);
 
-            double tempoEntreIteracoes =
-                double.Parse(
-                    configuracao[2],
-                    CultureInfo.InvariantCulture
-                );
+            double tempoEntreIteracoes = double.Parse(configuracao[2], CultureInfo.InvariantCulture);
 
             Universo universo = new Universo();
 
@@ -86,7 +83,7 @@ namespace HologramaGravitacional
             universo.TempoEntreIteracoes =
                 tempoEntreIteracoes;
 
-            // Cada linha restante representa um corpo.
+            // Cada linha restante representa um corpo no formato descrito acima.
             string? linha;
 
             while ((linha = arquivo.ReadLine()) != null)

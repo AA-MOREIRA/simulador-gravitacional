@@ -15,6 +15,11 @@ namespace HologramaGravitacional
             random = new Random();
         }
 
+        // Classe responsável por gerar um conjunto de corpos com
+        // propriedades físicas plausíveis e distribuir suas posições
+        // de forma a evitar sobreposição inicial. Esta classe é usada
+        // quando o usuário solicita criação randômica de corpos.
+
         public List<Corpo> Gerar(
             int quantidade,
             double tamanhoArea,
@@ -62,6 +67,11 @@ namespace HologramaGravitacional
              double tamanhoArea,
              bool velocidadeInicialZero)
         {
+            // Gera propriedades físicas básicas para o corpo.
+            // A massa e densidade seguem faixas definidas abaixo;
+            // a posição é sorteada dentro de uma área quadrada centrada
+            // na origem e as velocidades são geradas aleatoriamente
+            // (ou zeradas se solicitado).
             double massa = GerarMassa();
 
             double densidade = GerarDensidade();
@@ -74,11 +84,14 @@ namespace HologramaGravitacional
 
             if (velocidadeInicialZero)
             {
+                // Cenários estáticos iniciais podem ser úteis
+                // para testar atração puramente gravitacional.
                 velX = 0;
                 velY = 0;
             }
             else
             {
+                // Velocidades iniciais aleatórias em ambos os eixos.
                 velX = GerarVelocidade();
                 velY = GerarVelocidade();
             }
@@ -121,6 +134,8 @@ namespace HologramaGravitacional
         private double GerarMassa()
         {
             // Massa aleatória entre 1 e 10 trilhões de kg.
+            // Valores grandes facilitam a observação dos efeitos
+            // gravitacionais em escalas práticas do simulador.
             return random.NextDouble() * 9e12 + 1e12;
         }
 
@@ -128,20 +143,23 @@ namespace HologramaGravitacional
         {
             // Gera uma densidade dentro de uma faixa
             // válida para os corpos do simulador.
+            // A faixa começa em valores muito baixos (gases) e sobe
+            // até materiais extremamente densos. O construtor de
+            // Corpo rejeita densidades acima do limite definido.
             return random.NextDouble() * (22590 - 0.0899) + 0.0899;
         }
 
         private double GerarPosicao(double tamanhoArea)
         {
             // Distribui os corpos ao redor da origem.
-            return (random.NextDouble() * 2 - 1)
-                   * tamanhoArea;
+            // O valor retornado fica no intervalo [-tamanhoArea, +tamanhoArea].
+            return (random.NextDouble() * 2 - 1) * tamanhoArea;
         }
 
         private double GerarVelocidade()
         {
             // Velocidade inicial entre -1000 e +1000 m/s.
-            return (random.NextDouble() * 2) - 1;
+            return (random.NextDouble() * 2000.0) - 1000.0;
         }
     }
 }

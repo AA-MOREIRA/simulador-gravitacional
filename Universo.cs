@@ -8,7 +8,10 @@ namespace HologramaGravitacional
 {
     public class Universo
     {
-
+        // Representa o conjunto de corpos e operações que definem
+        // o estado do 'Universo' simulado. Esta classe mantém a
+        // lista de corpos e fornece métodos para calcular acelerações,
+        // executar iterações de tempo e tratar colisões.
         private readonly List<Corpo> corpos;
         public IReadOnlyList<Corpo> Corpos => corpos;
         public int QuantidadeFusoes { get; private set; }

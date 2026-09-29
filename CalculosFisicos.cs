@@ -8,13 +8,22 @@ namespace HologramaGravitacional
 {
     public static class CalculosFisicos
     {
+        // Biblioteca de funções físicas e utilitários usados pelo simulador.
+        // Centraliza fórmulas da gravitação newtoniana, cálculo de energia,
+        // momento e operações úteis para fusão de corpos.
+        //
+        // Observações:
+        // - Todas as funções usam o Sistema Internacional (SI):
+        //   massa (kg), comprimento (m), tempo (s).
+        // - A constante G está definida com o valor atual conhecido.
+
         public const double G = 6.67430e-11;
 
         public static double CalcularDistancia(Corpo corpoA, Corpo corpoB)
         {
             double dx = corpoB.PosX - corpoA.PosX;
             double dy = corpoB.PosY - corpoA.PosY;
-
+            // Distância euclidiana no plano 2D.
             return Math.Sqrt((dx * dx) + (dy * dy));
         }
 
@@ -49,6 +58,8 @@ namespace HologramaGravitacional
 
             double forca = CalcularForcaGravitacional(corpoA, corpoB);
 
+            // Projetamos a força total na direção entre os corpos
+            // nas componentes X e Y. Isso preserva sinal e direção.
             double forcaX = forca * dx / distancia;
             double forcaY = forca * dy / distancia;
 
@@ -73,6 +84,7 @@ namespace HologramaGravitacional
 
         public static double CalcularVolume(Corpo corpo)
         {
+            // Volume (m^3) a partir de massa (kg) e densidade (kg/m^3).
             return corpo.Massa / corpo.Densidade;
         }
         public static double CalcularDensidadeResultante(
@@ -107,11 +119,10 @@ namespace HologramaGravitacional
                 (corpoA.Massa * corpoA.VelY) +
                 (corpoB.Massa * corpoB.VelY);
 
-            double velocidadeX =
-                quantidadeMovimentoX / massaTotal;
-
-            double velocidadeY =
-                quantidadeMovimentoY / massaTotal;
+            // Conservação da quantidade de movimento linear:
+            // v_resultante = (p_total) / m_total
+            double velocidadeX = quantidadeMovimentoX / massaTotal;
+            double velocidadeY = quantidadeMovimentoY / massaTotal;
 
             return (velocidadeX, velocidadeY);
         }
@@ -156,6 +167,11 @@ namespace HologramaGravitacional
             string nome =
                 corpoA.Nome + "-" + corpoB.Nome;
 
+            // Retorna um novo corpo que representa a fusão de A e B.
+            // A massa é simplesmente soma das massas. A densidade é
+            // calculada a partir do volume combinado para manter coerência.
+            // A posição é o centro de massa e a velocidade obedece à
+            // conservação da quantidade de movimento.
             return new Corpo(
                 nome,
                 massaTotal,
