@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace HologramaGravitacional
@@ -26,6 +28,17 @@ namespace HologramaGravitacional
         private const double TamanhoArea = 1_000_000; // metros
         private const double DeltaTempo = 100;        // segundos
 
+        // Cada medição é repetida e usa-se a MEDIANA: ela descarta o efeito
+        // de interrupções ocasionais (outro programa usando a CPU, coleta de
+        // lixo do .NET), que distorceriam uma medição única ou a média.
+        private const int Repeticoes = 3;
+
+#if DEBUG
+        private const string Configuracao = "Debug";
+#else
+        private const string Configuracao = "Release";
+#endif
+
         public static void Executar(
             int[] quantidadesCorpos,
             int iteracoes,
@@ -35,7 +48,10 @@ namespace HologramaGravitacional
 
             Tela.Secao("COMPARATIVO DE PERFORMANCE: N1 (sequencial) x N2 (paralelo)");
             Tela.Campo("Processadores lógicos", processadores.ToString());
+            Tela.Campo("Processador", NomeProcessador());
             Tela.Campo("Iterações por teste", iteracoes.ToString());
+            Tela.Campo("Repetições (mediana)", Repeticoes.ToString());
+            Tela.Campo("Configuração", Configuracao);
             Tela.Campo("Δt", $"{DeltaTempo} s");
             Console.WriteLine();
 
@@ -68,16 +84,29 @@ namespace HologramaGravitacional
 
             foreach (int quantidade in quantidadesCorpos)
             {
-                Universo sequencial = CriarUniverso(quantidade, ModoProcessamento.Sequencial);
-                Universo paralelo = CriarUniverso(quantidade, ModoProcessamento.Paralelo);
+                var temposSequencial = new List<double>();
+                var temposParalelo = new List<double>();
+                bool iguais = true;
 
-                // Mostra o andamento na própria linha; "\r" volta ao início
-                // da linha, e o resultado final é escrito por cima.
-                Tela.Escrever(ConsoleColor.DarkGray, $"  {quantidade,8}   medindo sequencial...          \r");
-                double tempoSequencial = Medir(sequencial, iteracoes);
+                for (int r = 1; r <= Repeticoes; r++)
+                {
+                    // Universos novos a cada repetição: todos começam idênticos.
+                    Universo sequencial = CriarUniverso(quantidade, ModoProcessamento.Sequencial);
+                    Universo paralelo = CriarUniverso(quantidade, ModoProcessamento.Paralelo);
 
-                Tela.Escrever(ConsoleColor.DarkGray, $"  {quantidade,8}   medindo paralelo...            \r");
-                double tempoParalelo = Medir(paralelo, iteracoes);
+                    // Mostra o andamento na própria linha; "\r" volta ao início
+                    // da linha, e o resultado final é escrito por cima.
+                    Tela.Escrever(ConsoleColor.DarkGray, $"  {quantidade,8}   medindo sequencial ({r}/{Repeticoes})...   \r");
+                    temposSequencial.Add(Medir(sequencial, iteracoes));
+
+                    Tela.Escrever(ConsoleColor.DarkGray, $"  {quantidade,8}   medindo paralelo ({r}/{Repeticoes})...     \r");
+                    temposParalelo.Add(Medir(paralelo, iteracoes));
+
+                    iguais &= MesmoResultado(sequencial, paralelo);
+                }
+
+                double tempoSequencial = Mediana(temposSequencial);
+                double tempoParalelo = Mediana(temposParalelo);
 
                 // Speedup = quantas vezes a versão paralela foi mais rápida.
                 double speedup = tempoSequencial / tempoParalelo;
@@ -87,8 +116,6 @@ namespace HologramaGravitacional
                 // na prática é menor por causa do custo de dividir o trabalho
                 // entre threads e sincronizá-las a cada etapa.
                 double eficiencia = speedup / processadores * 100;
-
-                bool iguais = MesmoResultado(sequencial, paralelo);
 
                 // Verde quando o paralelo ganhou, amarelo quando perdeu.
                 Tela.Escrever(ConsoleColor.Cyan, $"  {quantidade,8}   ");
@@ -110,9 +137,52 @@ namespace HologramaGravitacional
 
             File.WriteAllText(caminhoCsv, csv.ToString(), Encoding.UTF8);
 
+            // Ambiente do teste, para o relatório (os tempos só fazem sentido
+            // junto com a máquina em que foram medidos).
+            string caminhoAmbiente = Path.ChangeExtension(caminhoCsv, null) + "_ambiente.txt";
+            File.WriteAllText(caminhoAmbiente, string.Join(Environment.NewLine,
+                $"Data: {DateTime.Now:dd/MM/yyyy HH:mm}",
+                $"Processador: {NomeProcessador()}",
+                $"Processadores lógicos: {processadores}",
+                $"Sistema: {RuntimeInformation.OSDescription}",
+                $".NET: {RuntimeInformation.FrameworkDescription}",
+                $"Configuração: {Configuracao}",
+                $"Depurador conectado: {(Debugger.IsAttached ? "sim" : "não")}",
+                $"Iterações por teste: {iteracoes}",
+                $"Repetições por medição (mediana): {Repeticoes}",
+                $"Δt: {DeltaTempo} s",
+                $"Área inicial: ±{TamanhoArea:N0} m",
+                $"Semente aleatória: {Semente}"), Encoding.UTF8);
+
             Console.WriteLine();
             Tela.Sucesso($"Resultados salvos em: {Path.GetFullPath(caminhoCsv)}");
             Tela.Info("Use esse arquivo para montar as tabelas e gráficos do relatório.");
+        }
+
+        private static double Mediana(List<double> valores)
+        {
+            var ordenados = valores.OrderBy(v => v).ToList();
+            int meio = ordenados.Count / 2;
+
+            return ordenados.Count % 2 == 1
+                ? ordenados[meio]
+                : (ordenados[meio - 1] + ordenados[meio]) / 2;
+        }
+
+        // Nome do processador, lido do registro do Windows.
+        private static string NomeProcessador()
+        {
+            try
+            {
+                using var chave = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                    @"HARDWARE\DESCRIPTION\System\CentralProcessor\0");
+
+                return (chave?.GetValue("ProcessorNameString") as string)?.Trim() ?? "desconhecido";
+            }
+            catch (Exception)
+            {
+                return "desconhecido";
+            }
         }
 
         private static Universo CriarUniverso(int quantidade, ModoProcessamento modo)
@@ -153,10 +223,18 @@ namespace HologramaGravitacional
         // Na primeira execução de cada método, o .NET compila o código
         // (JIT) e cria as threads do pool; sem o aquecimento, esse custo
         // entraria na primeira medição e distorceria o resultado.
+        //
+        // O .NET também usa "compilação em camadas": o código começa pouco
+        // otimizado e só é recompilado com otimização completa depois de
+        // muito usado. Por isso o aquecimento roda bastante trabalho
+        // (algumas centenas de milissegundos) antes de medir.
         private static void Aquecer()
         {
-            Medir(CriarUniverso(200, ModoProcessamento.Sequencial), 5);
-            Medir(CriarUniverso(200, ModoProcessamento.Paralelo), 5);
+            for (int i = 0; i < 3; i++)
+            {
+                Medir(CriarUniverso(500, ModoProcessamento.Sequencial), 20);
+                Medir(CriarUniverso(500, ModoProcessamento.Paralelo), 20);
+            }
         }
 
         // Compara corpo a corpo as duas simulações após as iterações.

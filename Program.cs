@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Windows.Forms;
 
 namespace HologramaGravitacional
@@ -17,6 +18,15 @@ namespace HologramaGravitacional
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Tela.Configurar();
+
+            // Modo não interativo: "HologramaGravitacional.exe --comparativo"
+            // roda só o comparativo de performance e encerra. Útil para gerar
+            // os números do relatório sem passar pelo menu.
+            if (args.Contains("--comparativo"))
+            {
+                ExecutarComparativo();
+                return;
+            }
 
             // Programa principal: gerencia o menu, a criação do Universo,
             // a simulação (com gravação no MySQL), o replay e o
@@ -80,19 +90,7 @@ namespace HologramaGravitacional
                 }
                 else if (opcao == "4")
                 {
-                    // Quantidades crescentes de corpos: o ganho do paralelismo
-                    // aparece conforme o trabalho O(n²) cresce. Com poucos
-                    // corpos, o custo de criar e sincronizar threads pode até
-                    // tornar a versão paralela mais lenta.
-                    int[] quantidades = { 50, 100, 250, 500, 1000, 2000 };
-                    int iteracoes = 10;
-
-                    ComparadorPerformance.Executar(
-                        quantidades,
-                        iteracoes,
-                        "comparativo_performance.csv"
-                    );
-
+                    ExecutarComparativo();
                     Tela.Pausar();
                 }
                 else if (opcao == "5")
@@ -107,6 +105,22 @@ namespace HologramaGravitacional
                     Tela.Pausar();
                 }
             }
+        }
+
+        private static void ExecutarComparativo()
+        {
+            // Quantidades crescentes de corpos: o ganho do paralelismo
+            // aparece conforme o trabalho O(n²) cresce. Com poucos
+            // corpos, o custo de criar e sincronizar threads pode até
+            // tornar a versão paralela mais lenta.
+            int[] quantidades = { 50, 100, 250, 500, 1000, 2000, 4000 };
+            int iteracoes = 30;
+
+            ComparadorPerformance.Executar(
+                quantidades,
+                iteracoes,
+                "comparativo_performance.csv"
+            );
         }
 
         // ================================================================
