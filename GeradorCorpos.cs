@@ -15,6 +15,15 @@ namespace HologramaGravitacional
             random = new Random();
         }
 
+        // Com uma semente fixa, a sequência de números "aleatórios" é
+        // sempre a mesma. O comparativo de performance usa isso para
+        // gerar dois Universos idênticos: um processado em modo
+        // sequencial e outro em modo paralelo.
+        public GeradorCorpos(int semente)
+        {
+            random = new Random(semente);
+        }
+
         // Classe responsável por gerar um conjunto de corpos com
         // propriedades físicas plausíveis e distribuir suas posições
         // de forma a evitar sobreposição inicial. Esta classe é usada
@@ -158,8 +167,14 @@ namespace HologramaGravitacional
 
         private double GerarVelocidade()
         {
-            // Velocidade inicial entre -1000 e +1000 m/s.
-            return (random.NextDouble() * 2000.0) - 1000.0;
+            // Velocidade inicial entre -0,1 e +0,1 m/s.
+            //
+            // Com massas de 1e12 a 1e13 kg separadas por dezenas de km,
+            // a velocidade de escape entre dois corpos é da ordem de
+            // 0,1 a 0,3 m/s. Velocidades muito maiores que isso fariam
+            // os corpos se afastarem em linha reta, sem que a atração
+            // gravitacional fosse perceptível.
+            return (random.NextDouble() * 0.2) - 0.1;
         }
     }
 }

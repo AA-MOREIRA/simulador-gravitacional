@@ -35,6 +35,13 @@ namespace HologramaGravitacional
 
         public double VelY { get; private set; }
 
+        // Valor do raio calculado uma única vez, no construtor.
+        // Massa e densidade nunca mudam depois que o corpo é criado
+        // (uma fusão cria um corpo NOVO), então não há por que
+        // recalcular a raiz cúbica a cada verificação de colisão,
+        // que acontece O(n²) vezes por iteração.
+        private readonly double raio;
+
         // O raio não é armazenado.
         // Ele é calculado a partir da massa e da densidade:
         //
@@ -49,13 +56,7 @@ namespace HologramaGravitacional
         // r = ³√(3m / 4πρ)
         public double Raio
         {
-            get
-            {
-                return Math.Cbrt(
-                    (3 * Massa) /
-                    (4 * Math.PI * Densidade)
-                );
-            }
+            get { return raio; }
         }
 
         public Corpo(
@@ -98,6 +99,12 @@ namespace HologramaGravitacional
             Nome = nome;
             Massa = massa;
             Densidade = densidade;
+
+            raio = Math.Cbrt(
+                (3 * Massa) /
+                (4 * Math.PI * Densidade)
+            );
+
             PosX = posX;
             PosY = posY;
             VelX = velX;
@@ -117,6 +124,15 @@ namespace HologramaGravitacional
             // nos eixos X e Y.
             VelX += aceleracaoX * deltaTempo;
             VelY += aceleracaoY * deltaTempo;
+        }
+
+        // Desfaz parte do último deslocamento, voltando o corpo pela
+        // mesma reta em que se moveu. Usado pela detecção de colisão
+        // para posicionar os corpos no instante exato do contato.
+        public void RecuarPosicao(double tempo)
+        {
+            PosX -= VelX * tempo;
+            PosY -= VelY * tempo;
         }
 
         public void AtualizarPosicao(double deltaTempo)

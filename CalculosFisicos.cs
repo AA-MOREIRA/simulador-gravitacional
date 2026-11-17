@@ -268,14 +268,78 @@ namespace HologramaGravitacional
 
             return energia;
         }
-        public static double CalcularEnergiaMecanicaTotal(
+        // Versão paralela da energia potencial.
+        //
+        // A soma percorre todos os pares (i, j) — custo O(n²), o mesmo
+        // da física — e é recalculada a cada iteração pelo Simulador
+        // para verificar a conservação de energia.
+        //
+        // Problema: várias threads somando na mesma variável causam
+        // condição de corrida (duas threads leem o mesmo valor antigo
+        // e uma das somas se perde).
+        //
+        // Solução usada (redução com variável local por thread):
+        // cada thread acumula em uma soma PARCIAL própria e só no final
+        // essa parcial é adicionada ao total, dentro de um lock.
+        // Assim o lock é usado poucas vezes (uma por thread), e não
+        // uma vez por par de corpos.
+        public static double CalcularEnergiaPotencialGravitacionalParalela(
     IReadOnlyList<Corpo> corpos)
+        {
+            double energiaTotal = 0;
+            object trava = new object();
+
+            Parallel.For(
+                0,
+                corpos.Count,
+
+                // Valor inicial da soma parcial de cada thread.
+                () => 0.0,
+
+                // Corpo do laço: soma os pares (i, j) com j > i na parcial.
+                (i, estado, parcial) =>
+                {
+                    for (int j = i + 1; j < corpos.Count; j++)
+                    {
+                        double distancia =
+                            CalcularDistancia(corpos[i], corpos[j]);
+
+                        if (distancia > 0)
+                        {
+                            parcial -=
+                                G *
+                                corpos[i].Massa *
+                                corpos[j].Massa /
+                                distancia;
+                        }
+                    }
+
+                    return parcial;
+                },
+
+                // Ao terminar, cada thread junta sua parcial ao total.
+                parcial =>
+                {
+                    lock (trava)
+                    {
+                        energiaTotal += parcial;
+                    }
+                });
+
+            return energiaTotal;
+        }
+        public static double CalcularEnergiaMecanicaTotal(
+    IReadOnlyList<Corpo> corpos,
+    bool paralelo = false)
         {
             double energiaCinetica =
                 CalcularEnergiaCineticaTotal(corpos);
 
-            double energiaPotencial =
-                CalcularEnergiaPotencialGravitacional(corpos);
+            // A energia cinética é O(n) e barata; só a potencial,
+            // que é O(n²), compensa ser paralelizada.
+            double energiaPotencial = paralelo
+                ? CalcularEnergiaPotencialGravitacionalParalela(corpos)
+                : CalcularEnergiaPotencialGravitacional(corpos);
 
             return energiaCinetica + energiaPotencial;
         }
